@@ -1,14 +1,17 @@
 import jwt from "jsonwebtoken";
 import express from "express";
-import type { Request, Response, NextFunction } from "express";
+import type { Request, Response, NextFunction, RequestHandler } from "express";
 import bcrypt from "bcrypt";
 import { config, logger } from "./config";
 import { custom, z } from "zod";
 import { prismaConstructor, schema } from "./db";
 import { Prisma, PrismaClient } from "@prisma/client";
-import e from "express";
+import { middlewares } from "./middle";
 
-type RouteHandler = (req: Request, res: Response, next?: NextFunction) => void;
+
+interface Handler extends RequestHandler {
+
+}
 
 interface Controller {
     path: string,
@@ -35,7 +38,11 @@ class PostsController implements Controller {
     constructor(public db: PrismaClient) {
         this.db = db;
         this.router.get(this.path, this.get);
-        this.router.get(`${this.path}/:id`, this.getById);
+        this.router.get(
+            `${this.path}/:id`,
+            [middlewares.bodyValidation(schema.post), middlewares.urlValidation],
+            this.getById
+        );
         this.router.post(this.path, this.post);
         this.router.delete(`${this.path}/:id`, this.deleteById);
         this.router.patch(`${this.path}/:id`, this.patchById);
@@ -59,7 +66,7 @@ class PostsController implements Controller {
         }
     };
 
-    private getById: RouteHandler = async (req, res) => {
+    private getById: RequestHandler = async (req, res) => {
         const id = z.number().parse(req.params.id);
         const result = await this.db.post.findUnique({ where: { id: id } });
         if (result === null) {
@@ -69,7 +76,7 @@ class PostsController implements Controller {
         }
     };
 
-    private patchById: RouteHandler = async (req, res) => {
+    private patchById: RequestHandler = async (req, res) => {
         const id = z.number().parse(req.params.id);
         const newPost = z.object({ content: z.string(), title: z.string() }).safeParse(req.body);
         if (!newPost.success) {
@@ -78,11 +85,12 @@ class PostsController implements Controller {
                     "Error: /posts/:id expects {content: string, title: string}. Data provided is in incorrect shape"
             });
         } else {
+
             this.db.post.update({ where: { id: id }, data: { title: newPost.data.title, content: newPost.data.content } });
         }
     };
 
-    private deleteById: RouteHandler = async (req, res) => {
+    private deleteById: RequestHandler = async (req, res) => {
         const id = z.number().parse(req.params.id);
         const find = await this.db.post.findUnique({ where: { id: id } });
         if (!find) {
@@ -100,12 +108,6 @@ class PostsController implements Controller {
 class App {
     public app: express.Application;
     public config = config;
-    public middlewares = {
-        logger: (req: Request, _res: Response, next: NextFunction) => {
-            logger.log("info", `REQUEST FROM IP: [${req.ip}] METHOD: [${req.method}] PATH: [${req.path}]`); next();
-        },
-        bodyParser: express.json()
-    } as const;
 
     constructor(controllers: Controller[]) {
         this.app = express();
@@ -114,8 +116,8 @@ class App {
 
     private initializeControllers(controllers: Controller[]) {
         controllers.forEach(c => {
-            this.app.use(this.middlewares.logger);
-            this.app.use(this.middlewares.bodyParser);
+            this.app.use(middlewares.logging);
+            this.app.use(express.json());
             this.app.use("/", c.router);
         });
     }
