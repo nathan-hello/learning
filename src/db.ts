@@ -24,8 +24,7 @@ export function prismaConstructor() {
     });
 
     prisma.$on("query", (e) => {
-        // logger.log("info", `${e.timestamp} | ${e.query} | ${e.params} | ${e.target} | ${e.duration}`);
-        logger.log("info", `asdf`);
+        logger.log("info", `${e.timestamp} | ${e.query} | ${e.params} | ${e.target} | ${e.duration}`);
     });
     prisma.$on("info", (e) => {
         logger.log("info", `PRISMA: ${e.message} | ${e.target}`);

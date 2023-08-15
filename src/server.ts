@@ -6,13 +6,14 @@ import { config, logger } from "./config";
 import { custom, z } from "zod";
 import { prismaConstructor, schema } from "./db";
 import { Prisma, PrismaClient } from "@prisma/client";
+import e from "express";
 
+type RouteHandler = (req: Request, res: Response, next?: NextFunction) => void;
 
 interface Controller {
     path: string,
     router: express.Router;
     db: PrismaClient;
-    initalizeRoutes(): void;
 }
 
 class IndexController implements Controller {
@@ -20,15 +21,11 @@ class IndexController implements Controller {
     public router = express.Router();
 
     constructor(public db: PrismaClient) {
-        this.initalizeRoutes();
         this.db = db;
-    }
-
-    public initalizeRoutes() {
         this.router.get(this.path, this.get);
     }
 
-    get = (_req: Request, res: Response) => res.status(200).send({ message: "Hello!" });
+    private get = (_req: Request, res: Response) => res.status(200).send({ message: "Hello!" });
 }
 
 class PostsController implements Controller {
@@ -37,31 +34,65 @@ class PostsController implements Controller {
 
     constructor(public db: PrismaClient) {
         this.db = db;
-        this.initalizeRoutes();
-    }
-
-    public initalizeRoutes() {
         this.router.get(this.path, this.get);
+        this.router.get(`${this.path}/:id`, this.getById);
         this.router.post(this.path, this.post);
+        this.router.delete(`${this.path}/:id`, this.deleteById);
+        this.router.patch(`${this.path}/:id`, this.patchById);
     }
 
 
-    get = async (_req: express.Request, res: express.Response) => {
+    private get = async (_req: Request, res: Response) => {
         const allPosts = await this.db.post.findMany();
         res.send(allPosts);
     };
 
-    post = async (req: express.Request, res: express.Response) => {
+    private post = async (req: Request, res: Response) => {
         const post = schema.post.safeParse(req.body);
-        if (post.success) {
+        if (!post.success) {
+            res.status(405).send(post.error);
+        } else {
             await this.db.post.create({
                 data: post.data
             });
             res.status(200).send(post.data);
-        } else {
-            res.status(405).send(post.error);
         }
     };
+
+    private getById: RouteHandler = async (req, res) => {
+        const id = z.number().parse(req.params.id);
+        const result = await this.db.post.findUnique({ where: { id: id } });
+        if (result === null) {
+            res.status(404).send("Post not found");
+        } else {
+            res.status(200).send(result);
+        }
+    };
+
+    private patchById: RouteHandler = async (req, res) => {
+        const id = z.number().parse(req.params.id);
+        const newPost = z.object({ content: z.string(), title: z.string() }).safeParse(req.body);
+        if (!newPost.success) {
+            res.status(400).send({
+                message:
+                    "Error: /posts/:id expects {content: string, title: string}. Data provided is in incorrect shape"
+            });
+        } else {
+            this.db.post.update({ where: { id: id }, data: { title: newPost.data.title, content: newPost.data.content } });
+        }
+    };
+
+    private deleteById: RouteHandler = async (req, res) => {
+        const id = z.number().parse(req.params.id);
+        const find = await this.db.post.findUnique({ where: { id: id } });
+        if (!find) {
+            res.status(400).send({ message: `Post at id ${id} not found` });
+        } else {
+            await this.db.post.delete({ where: { id: find.id } });
+            res.status(200).send({ message: `Deleted post ${id}` });
+        };
+    };
+
 }
 
 
