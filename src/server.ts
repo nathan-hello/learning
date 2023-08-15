@@ -2,13 +2,16 @@ import jwt from "jsonwebtoken";
 import express from "express";
 import type { Request, Response, NextFunction } from "express";
 import bcrypt from "bcrypt";
-import { config } from "./config";
-import { z } from "zod";
+import { config, logger } from "./config";
+import { custom, z } from "zod";
+import { prismaConstructor, schema } from "./db";
+import { Prisma, PrismaClient } from "@prisma/client";
 
 
 interface Controller {
     path: string,
     router: express.Router;
+    db: PrismaClient;
     initalizeRoutes(): void;
 }
 
@@ -16,87 +19,73 @@ class IndexController implements Controller {
     public path = "/";
     public router = express.Router();
 
-    constructor() {
+    constructor(public db: PrismaClient) {
         this.initalizeRoutes();
+        this.db = db;
     }
-    public initalizeRoutes() {
-        this.router.get(this.path, this.getIndex);
 
+    public initalizeRoutes() {
+        this.router.get(this.path, this.get);
     }
-    getIndex = (_req: Request, res: Response) => res.status(200).send({ status: "success" });
+
+    get = (_req: Request, res: Response) => res.status(200).send({ message: "Hello!" });
 }
 
 class PostsController implements Controller {
     public path = '/posts';
     public router = express.Router();
-    public postSchema = z.object({
-        author: z.string(),
-        content: z.string(),
-        title: z.string(),
-    });
 
-    private posts: z.infer<typeof this.postSchema>[] = [
-        {
-            author: 'Marcin',
-            content: 'Dolor sit amet',
-            title: 'Lorem Ipsum',
-        }
-    ];
-
-    constructor() {
+    constructor(public db: PrismaClient) {
+        this.db = db;
         this.initalizeRoutes();
     }
 
     public initalizeRoutes() {
-        this.router.get(this.path, this.getAllPosts);
-        this.router.post(this.path, this.createAPost);
+        this.router.get(this.path, this.get);
+        this.router.post(this.path, this.post);
     }
 
-    private validatePost(body: unknown) {
-        return this.postSchema.safeParse(body);
-    }
 
-    getAllPosts = (req: express.Request, res: express.Response) => {
-        res.send(this.posts);
+    get = async (_req: express.Request, res: express.Response) => {
+        const allPosts = await this.db.post.findMany();
+        res.send(allPosts);
     };
 
-    createAPost = (req: express.Request, res: express.Response) => {
-        const post = this.validatePost(req.body);
+    post = async (req: express.Request, res: express.Response) => {
+        const post = schema.post.safeParse(req.body);
         if (post.success) {
-            this.posts.push(post.data);
-            res.send(post.data);
+            await this.db.post.create({
+                data: post.data
+            });
+            res.status(200).send(post.data);
         } else {
             res.status(405).send(post.error);
         }
     };
 }
 
-const middlewares = {
-    logger: (req: Request, _res: Response, next: NextFunction) => { console.log(`${req.method} ${req.path}`); next(); },
-    bodyParser: express.json()
-} as const;
+
 
 class App {
     public app: express.Application;
-    public config: typeof config;
+    public config = config;
+    public middlewares = {
+        logger: (req: Request, _res: Response, next: NextFunction) => {
+            logger.log("info", `REQUEST FROM IP: [${req.ip}] METHOD: [${req.method}] PATH: [${req.path}]`); next();
+        },
+        bodyParser: express.json()
+    } as const;
 
-    constructor(controllers: Controller[], middleware?: typeof middlewares) {
+    constructor(controllers: Controller[]) {
         this.app = express();
-        this.config = config;
-        this.initializeMiddlewares();
         this.initializeControllers(controllers);
-
-    }
-
-    private initializeMiddlewares() {
-        this.app.use(middlewares.logger);
     }
 
     private initializeControllers(controllers: Controller[]) {
         controllers.forEach(c => {
-            this.app.use(middlewares.bodyParser);
-            this.app.use(middlewares.logger);
-            this.app.use('/', c.router);
+            this.app.use(this.middlewares.logger);
+            this.app.use(this.middlewares.bodyParser);
+            this.app.use("/", c.router);
         });
     }
 
@@ -105,9 +94,11 @@ class App {
     }
 }
 
+const prisma = prismaConstructor();
+
 const app = new App([
-    new IndexController(),
-    new PostsController(),
-], middlewares);
+    new IndexController(prisma),
+    new PostsController(prisma),
+]);
 
 app.listen();
