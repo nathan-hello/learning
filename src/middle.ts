@@ -17,6 +17,30 @@ class HttpException extends Error {
     }
 }
 
+export class WrongCredentialsException extends HttpException {
+    constructor() {
+        super(401, "Bad credentials");
+    }
+}
+
+export class BadRegistryInfo extends HttpException {
+    constructor() {
+        super(401, "Bad registration details, or account already exists.");
+    }
+}
+
+export class BadId extends HttpException {
+    constructor() {
+        super(404, "Bad post id");
+    }
+}
+
+export class BadBody extends HttpException {
+    constructor(error: string) {
+        super(400, `Error when parsing body: ${error}`);
+    }
+}
+
 function logging(req: Request, _res: Response, next: NextFunction) {
     logger.log("info", `REQUEST FROM IP: [${req.ip}] METHOD: [${req.method}] PATH: [${req.path}]`); next();
 }

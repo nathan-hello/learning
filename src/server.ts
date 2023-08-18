@@ -4,14 +4,14 @@ import type { Request, Response, NextFunction, RequestHandler } from "express";
 import bcrypt from "bcrypt";
 import { config, logger } from "./config";
 import { custom, z } from "zod";
-import { prismaConstructor, schema } from "./db";
+import { prismaConstructor, responseSchema, requestSchema } from "./db";
 import { Prisma, PrismaClient } from "@prisma/client";
-import { middlewares } from "./middle";
+import { BadBody, BadId, BadRegistryInfo, WrongCredentialsException, middlewares } from "./middle";
+import { networkInterfaces } from "os";
+import { match } from "assert";
+import { nextTick } from "process";
 
 
-interface Handler extends RequestHandler {
-
-}
 
 interface Controller {
     path: string,
@@ -31,6 +31,63 @@ class IndexController implements Controller {
     private get = (_req: Request, res: Response) => res.status(200).send({ message: "Hello!" });
 }
 
+class AuthController implements Controller {
+    public path = "/auth";
+    public router = express.Router();
+
+    constructor(public db: PrismaClient) {
+        this.db = db;
+
+    }
+
+    private postRegister: RequestHandler = async (req, res, next) => {
+        const newUser = requestSchema.user.safeParse(req.body);
+        if (!newUser.success) {
+            next(new BadRegistryInfo());
+            return;
+        }
+        const checkUserExists = await this.db.user.findFirst({ where: { email: newUser.data.email } });
+        if (checkUserExists) {
+            next(new BadRegistryInfo());
+            return;
+        }
+
+        const hashedPassword = await bcrypt.hash(newUser.data.password, 10);
+        const upload = await this.db.user.create({
+            data: {
+                email: newUser.data.email,
+                password: hashedPassword
+            }
+        });
+        res.json({ message: `created user with email ${upload.email}` });
+
+
+    };
+
+    private postLogin: RequestHandler = async (req, res, next) => {
+        const loginData = requestSchema.user.safeParse(req.body);
+
+        if (!loginData.success) {
+            next(new WrongCredentialsException());
+            return;
+        }
+        const user = await this.db.user.findUnique({ where: { email: loginData.data.email } });
+        if (!user) {
+            next(new WrongCredentialsException());
+            return;
+        }
+
+        const matchPassword = await bcrypt.compare(loginData.data.password, user.password);
+        if (!matchPassword) {
+            next(new WrongCredentialsException());
+            return;
+        }
+
+        res.json({ message: `user ${loginData.data.email} logged in` });
+
+    };
+}
+
 class PostsController implements Controller {
     public path = '/posts';
     public router = express.Router();
@@ -38,70 +95,97 @@ class PostsController implements Controller {
     constructor(public db: PrismaClient) {
         this.db = db;
         this.router.get(this.path, this.get);
-        this.router.get(
-            `${this.path}/:id`,
-            [middlewares.bodyValidation(schema.post), middlewares.urlValidation],
-            this.getById
-        );
+        this.router.get(`${this.path}/:id`, this.getById);
         this.router.post(this.path, this.post);
         this.router.delete(`${this.path}/:id`, this.deleteById);
         this.router.patch(`${this.path}/:id`, this.patchById);
     }
 
 
-    private get = async (_req: Request, res: Response) => {
+    private get: RequestHandler = async (req, res, next) => {
         const allPosts = await this.db.post.findMany();
         res.send(allPosts);
     };
 
-    private post = async (req: Request, res: Response) => {
-        const post = schema.post.safeParse(req.body);
+    private post: RequestHandler = async (req, res, next) => {
+        const post = requestSchema.post.safeParse(req.body);
         if (!post.success) {
-            res.status(405).send(post.error);
-        } else {
-            await this.db.post.create({
-                data: post.data
-            });
-            res.status(200).send(post.data);
+            next(new BadBody(post.error.message));
+            return;
         }
+        const newPost = await this.db.post.create({
+            data: post.data
+        });
+        res.send({ message: newPost.id });
+        return;
+
     };
 
-    private getById: RequestHandler = async (req, res) => {
-        const id = z.number().parse(req.params.id);
-        const result = await this.db.post.findUnique({ where: { id: id } });
-        if (result === null) {
-            res.status(404).send("Post not found");
-        } else {
-            res.status(200).send(result);
+    private getById: RequestHandler = async (req, res, next) => {
+        const id = z.coerce.number().safeParse(req.params.id);
+        if (!id.success) {
+            next(new BadId());
+            return;
         }
+        const result = await this.db.post.findUnique({ where: { id: id.data } });
+        if (!result) {
+            res.sendStatus(404);
+            return;
+        }
+        res.json(result);
+        return;
+
     };
 
-    private patchById: RequestHandler = async (req, res) => {
-        const id = z.number().parse(req.params.id);
-        const newPost = z.object({ content: z.string(), title: z.string() }).safeParse(req.body);
+    private patchById: RequestHandler = async (req, res, next) => {
+        const id = z.coerce.number().safeParse(req.params.id);
+        if (!id.success) {
+            next(new BadId());
+            return;
+        }
+        const findPost = await this.db.post.findUnique({ where: { id: id.data } });
+        if (!findPost) {
+            next(new BadId());
+            return;
+        }
+
+        const newPost = requestSchema.post.safeParse(req.body);
         if (!newPost.success) {
-            res.status(400).send({
-                message:
-                    "Error: /posts/:id expects {content: string, title: string}. Data provided is in incorrect shape"
-            });
-        } else {
-
-            this.db.post.update({ where: { id: id }, data: { title: newPost.data.title, content: newPost.data.content } });
+            next(new BadBody(newPost.error.message));
+            return;
         }
+
+        const update = await this.db.post.update({
+            where: { id: findPost.id }, data: {
+                title: newPost.data.title,
+                content: newPost.data.content,
+                author: newPost.data.author
+            }
+        });
+
+        res.json({ message: update.id });
+        return;
     };
 
-    private deleteById: RequestHandler = async (req, res) => {
-        const id = z.number().parse(req.params.id);
-        const find = await this.db.post.findUnique({ where: { id: id } });
-        if (!find) {
-            res.status(400).send({ message: `Post at id ${id} not found` });
-        } else {
-            await this.db.post.delete({ where: { id: find.id } });
-            res.status(200).send({ message: `Deleted post ${id}` });
-        };
-    };
+    private deleteById: RequestHandler = async (req, res, next) => {
+        const id = z.coerce.number().safeParse(req.params.id);
+        if (!id.success) {
+            next(new BadId());
+            return;
+        }
+        const findPost = await this.db.post.findUnique({ where: { id: id.data } });
+        if (!findPost) {
+            next(new BadId());
+            return;
+        }
 
-}
+        const deleted = await this.db.post.delete({ where: { id: findPost.id } });
+        res.json({ message: deleted.id });
+        return;
+    };
+};
+
+
 
 
 
@@ -118,6 +202,7 @@ class App {
         controllers.forEach(c => {
             this.app.use(middlewares.logging);
             this.app.use(express.json());
+            this.app.use(express.text());
             this.app.use("/", c.router);
         });
     }

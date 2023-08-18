@@ -36,10 +36,11 @@ posts_post() {
   --header "Content-Type: application/json" \
   --request POST \
   --data '{"author":"steve","content":"minecraft tutorial", "title": "how to"}' \
-  -o /dev/null \
-  -w "%{http_code}" \
   ${BASE_URL}/posts \
   )
+  # -o /dev/null \
+  # -w "%{http_code}" \
+  
 }
 
 
