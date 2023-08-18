@@ -116,7 +116,7 @@ class PostsController implements Controller {
         const newPost = await this.db.post.create({
             data: post.data
         });
-        res.send({ message: newPost.id });
+        res.send({ id: newPost.id });
         return;
 
     };
@@ -163,7 +163,7 @@ class PostsController implements Controller {
             }
         });
 
-        res.json({ message: update.id });
+        res.json(update);
         return;
     };
 
@@ -180,7 +180,7 @@ class PostsController implements Controller {
         }
 
         const deleted = await this.db.post.delete({ where: { id: findPost.id } });
-        res.json({ message: deleted.id });
+        res.json({ id: deleted.id });
         return;
     };
 };

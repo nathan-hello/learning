@@ -5,13 +5,13 @@ import { z } from "zod";
 
 export const responseSchema = {
     getPostById: z.object({
-        id: z.number().optional(),
+        id: z.number(),
         author: z.string(),
         content: z.string(),
         title: z.string(),
         date: z.string()
     }),
-    postPost: z.object({
+    postIdObject: z.object({
         id: z.number()
     }),
 
