@@ -37,7 +37,8 @@ class AuthController implements Controller {
 
     constructor(public db: PrismaClient) {
         this.db = db;
-
+        this.router.post(`${this.path}/register`, this.postRegister);
+        this.router.post(`${this.path}/login`, this.postLogin);
     }
 
     private postRegister: RequestHandler = async (req, res, next) => {
@@ -59,9 +60,8 @@ class AuthController implements Controller {
                 password: hashedPassword
             }
         });
-        res.json({ message: `created user with email ${upload.email}` });
-
-
+        res.json({ email: `${upload.email}` });
+        return;
     };
 
     private postLogin: RequestHandler = async (req, res, next) => {
@@ -83,7 +83,7 @@ class AuthController implements Controller {
             return;
         }
 
-        res.json({ message: `user ${loginData.data.email} logged in` });
+        res.json({ email: loginData.data.email });
 
     };
 }

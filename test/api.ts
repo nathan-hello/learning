@@ -67,6 +67,7 @@ async function testPostsController() {
         .then(v => responseSchema.postIdObject.parse(v))
         .then(c => { console.log(`/post/${postPosts.id} DELETE: id: ${c.id}`); return c; });
 
+
 }
 
 testPostsController();

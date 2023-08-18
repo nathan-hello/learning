@@ -14,6 +14,9 @@ export const responseSchema = {
     postIdObject: z.object({
         id: z.number()
     }),
+    goodAuthResponse: z.object({
+        email: z.string()
+    })
 
 };
 
