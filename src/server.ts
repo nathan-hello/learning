@@ -66,11 +66,11 @@ class AuthController implements Controller {
 
     private postLogin: RequestHandler = async (req, res, next) => {
         const loginData = requestSchema.user.safeParse(req.body);
-
         if (!loginData.success) {
             next(new WrongCredentialsException());
             return;
         }
+
         const user = await this.db.user.findUnique({ where: { email: loginData.data.email } });
         if (!user) {
             next(new WrongCredentialsException());
@@ -84,7 +84,7 @@ class AuthController implements Controller {
         }
 
         res.json({ email: loginData.data.email });
-
+        return;
     };
 }
 
@@ -103,8 +103,22 @@ class PostsController implements Controller {
 
 
     private get: RequestHandler = async (req, res, next) => {
-        const allPosts = await this.db.post.findMany();
-        res.send(allPosts);
+        var offset = 0;
+        var limit = 5;
+        if (req.query.offset) {
+            var offset = z.coerce.number().min(0).parse(req.query.offset);
+        }
+        if (req.query.limit) {
+            var limit = z.coerce.number().max(20).parse(req.query.limit);
+        }
+
+        const posts = await this.db.post.findMany({
+            take: limit,
+            orderBy: { id: "asc" },
+            where: { id: { gte: offset, lte: offset + limit } }
+        });
+        res.send(posts);
+        return;
     };
 
     private post: RequestHandler = async (req, res, next) => {

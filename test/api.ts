@@ -12,6 +12,11 @@ async function testPostsController() {
         .then(v => z.array(responseSchema.getPostById).parse(v))
         .then((c) => { console.log(`/posts GET length: ${c.length}`); return c; });
 
+    const getPostsQuery = await fetch(`${baseUrl}/posts?offset=12&limit=3`)
+        .then(r => r.json())
+        .then(v => z.array(responseSchema.getPostById).parse(v))
+        .then((c) => { console.log(`/posts?offset=12&limit=3 GET length: ${c.length} 1st id: ${c.at(0)!.id} last id: ${c.at(-1)!.id} `); return c; });
+
     const postPosts = await fetch(`${baseUrl}/posts`, {
         method: "POST",
         headers: {

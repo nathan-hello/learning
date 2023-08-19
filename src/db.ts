@@ -50,10 +50,10 @@ export function prismaConstructor() {
         logger.log("info", `PRISMA: ${e.message} | ${e.target}`);
     });
     prisma.$on("warn", (e) => {
-        logger.log("warn", `PRISMA: ${e.timestamp} | ${e.message} | ${e.target}`);
+        logger.log("warn", `PRISMA: ${e.message} | ${e.target}`);
     });
     prisma.$on("error", (e) => {
-        logger.log("error", `PRISMA: ${e.timestamp} | ${e.message} | ${e.target}`);
+        logger.log("error", `PRISMA: ${e.message} | ${e.target}`);
     });
     return prisma;
 }
