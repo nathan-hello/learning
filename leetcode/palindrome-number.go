@@ -16,14 +16,14 @@
 //     -231 <= x <= 231 - 1
 // Follow up: Could you solve it without converting the integer to a string?
 
-package main
+package leetcode
 
 import (
 	"fmt"
 	"reflect"
 )
 
-func isPalendrome(x int) bool {
+func isPalindrome(x int) bool {
 	if x < 0 {
 		x = -x
 	}
@@ -51,8 +51,6 @@ func isPalendrome(x int) bool {
 		reverse[len(second)-1-i] = v
 	}
 
-	fmt.Printf("first: %v, second %v\n", first, second)
-
 	if reflect.DeepEqual(first, reverse) {
 		return true
 	} else {
@@ -61,17 +59,15 @@ func isPalendrome(x int) bool {
 
 }
 
-func main() {
-	ex1 := 121
-	ex2 := -121
-	ex3 := 10
+func PalindromeNumber() {
 
-	p1 := isPalendrome(ex1)
-	p2 := isPalendrome(ex2)
-	p3 := isPalendrome(ex3)
+	var o = make(map[int]bool)
+	i := []int{121, -121, 10, 500, 30203}
 
-	fmt.Printf("p1: %v\n", p1)
-	fmt.Printf("p2: %v\n", p2)
-	fmt.Printf("p3: %v\n", p3)
+	for _, v := range i {
+		o[v] = isPalindrome(v)
+	}
+
+	fmt.Printf("Palindrome Numbers: %#v\n", o)
 
 }

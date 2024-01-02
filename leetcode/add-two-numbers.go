@@ -17,7 +17,7 @@
 //0 <= Node.val <= 9
 //It is guaranteed that the list represents a number that does not have leading zeros.
 
-package main
+package leetcode
 
 import (
 	"fmt"
@@ -54,7 +54,7 @@ func (ln *ListNode) show() {
 	}
 }
 
-func main() {
+func AddTwoNumbers() {
 
 	s1 := []int{2, 4, 3}
 	s2 := []int{5, 6, 4, 6, 2, 1, 4, 6, 5}
