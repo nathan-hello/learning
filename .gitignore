@@ -1,3 +1,8 @@
+# Python stuff
+__pycache__
+secret.py
+
+# Default Node .gitignore from GitHub
 # Logs
 logs
 *.log
