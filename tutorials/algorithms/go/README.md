@@ -1,0 +1,1 @@
+kata-machine is the repo for the [The Last Algorithms Course You'll Need](https://frontendmasters.com/courses/algorithms/) class. It felt kinda wrong to write typescript for this class, and I enjoy writing go so I'm going to write the algorithms in go.
