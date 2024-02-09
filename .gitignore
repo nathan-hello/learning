@@ -1,5 +1,6 @@
 # Python stuff
 __pycache__
+*.db
 secret.py
 
 # Default Node .gitignore from GitHub
