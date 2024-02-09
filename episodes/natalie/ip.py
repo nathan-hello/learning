@@ -52,22 +52,6 @@ def insert_data(ip: IpInfo):
         conn.close()
 
 
-async def __run(ip):
-    obj = ipwhois.IPWhois(ip)
-    result = obj.lookup_whois()
-    if "nets" in result:
-        net_info = result["nets"][0]
-        n = IpInfo(
-            ip,
-            net_info.get("cidr"),
-            net_info.get("asn"),
-            net_info.get("name"),
-            net_info.get("country"),
-            net_info.get("city"),
-            net_info.get("description"),
-        )
-        insert_data(n)
-        print(n)
 
 
 # Function to query WHOIS information for an IP address
@@ -94,6 +78,22 @@ def get_whois_sync(ips):
 
 
 async def get_whois_async(ips):
+    async def __run(ip):
+        obj = ipwhois.IPWhois(ip)
+        result = obj.lookup_whois()
+        if "nets" in result:
+            net_info = result["nets"][0]
+            n = IpInfo(
+                ip,
+                net_info.get("cidr"),
+                net_info.get("asn"),
+                net_info.get("name"),
+                net_info.get("country"),
+                net_info.get("city"),
+                net_info.get("description"),
+            )
+            insert_data(n)
+            print(n)
     promises: list[Coroutine] = []
 
     for ip in ips:
